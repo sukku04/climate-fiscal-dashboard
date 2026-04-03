@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기후재정 분석 대시보드 | Solutions for Our Climate</title>
+<meta name="description" content="대한민국 중앙정부 기후·온실가스 감축 예산 분석 대시보드. 열린재정 Open API 데이터 기반.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c14;--bg2:#0d1320;--bg3:#121a2e;
+  --sur:#182032;--sur2:#1e2840;
+  --bdr:#243050;--bdr2:#2e3c60;
+  --txt:#dce8f8;--mut:#607090;--dim:#384a6a;
+  --g:#1de9b0;--g2:rgba(29,233,176,.08);--g3:rgba(29,233,176,.15);
+  --r:#ff5c72;--a:#ffb830;--b:#4da6ff;--p:#b388ff;
+  --c1:#1de9b0;--c2:#4da6ff;--c3:#ffb830;--c4:#ff5c72;
+  --c5:#b388ff;--c6:#ff8a65;--c7:#40e0d0;--c8:#f06292;--c9:#aed581;
+  --font:'Pretendard',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* ── HEADER ── */
+.hd{
+  position:sticky;top:0;z-index:200;height:56px;
+  background:rgba(8,12,20,.96);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;padding:0 24px;gap:14px;
+}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
+.logo-mark{
+  width:34px;height:34px;border-radius:8px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--g) 0%,var(--b) 100%);
+  display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+.logo-tx{font-size:14.5px;font-weight:700;letter-spacing:-.3px;color:var(--txt)}
+.logo-sub{font-size:10px;color:var(--mut);margin-top:1px}
+.sep{width:1px;height:24px;background:var(--bdr);flex-shrink:0}
+.nav{display:flex;gap:2px}
+.nb{
+  padding:5px 13px;border-radius:6px;border:none;cursor:pointer;
+  font-family:var(--font);font-size:12.5px;font-weight:500;
+  color:var(--mut);background:transparent;transition:all .12s;
+}
+.nb:hover{color:var(--txt);background:var(--sur)}
+.nb.on{color:var(--g);background:var(--g2)}
+.hright{margin-left:auto;display:flex;align-items:center;gap:10px}
+.udot{width:7px;height:7px;border-radius:50%;background:var(--mut);flex-shrink:0;transition:all .3s}
+.udot.ok{background:var(--g);box-shadow:0 0 8px var(--g)}
+.udot.err{background:var(--r);box-shadow:0 0 6px var(--r)}
+.udot.spin{background:var(--a);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.utxt{font-size:11px;color:var(--mut);font-family:var(--mono);white-space:nowrap}
+.share-btn{
+  padding:5px 12px;border-radius:5px;border:1px solid var(--bdr2);
+  background:transparent;color:var(--mut);font-family:var(--font);
+  font-size:11.5px;cursor:pointer;transition:all .12s;
+}
+.share-btn:hover{border-color:var(--g);color:var(--g)}
+
+/* ── LAYOUT ── */
+.wrap{display:flex;height:calc(100vh - 56px)}
+.side{
+  width:210px;flex-shrink:0;background:var(--bg2);
+  border-right:1px solid var(--bdr);overflow-y:auto;padding:14px 0;
+}
+.slbl{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);padding:6px 16px 4px}
+.si{
+  display:flex;align-items:center;gap:7px;padding:6px 12px;
+  border-radius:5px;margin:0 6px 1px;font-size:12.5px;
+  color:var(--mut);cursor:pointer;transition:all .1s;
+}
+.si:hover{color:var(--txt);background:var(--sur)}
+.si.on{color:var(--g);background:var(--g2)}
+.sico{font-size:13px;flex-shrink:0}
+.shr{border:none;border-top:1px solid var(--bdr);margin:8px 0}
+.sinfo{font-size:10.5px;color:var(--mut);line-height:1.9;padding:2px 16px}
+.syear-filter{padding:0 10px}
+.ychip{
+  display:inline-block;padding:3px 9px;border-radius:4px;font-size:11.5px;font-weight:500;
+  font-family:var(--mono);border:1px solid var(--bdr);background:transparent;
+  color:var(--mut);cursor:pointer;margin:2px;transition:all .1s;
+}
+.ychip:hover{border-color:var(--bdr2);color:var(--txt)}
+.ychip.on{background:var(--g2);border-color:var(--g3);color:var(--g)}
+
+/* ── MAIN ── */
+.main{flex:1;overflow-y:auto;background:var(--bg);padding:22px}
+.pg{display:none}.pg.on{display:block}
+
+/* ── PAGE HEADER ── */
+.ph{display:flex;align-items:flex-end;gap:12px;margin-bottom:18px;padding-bottom:13px;border-bottom:1px solid var(--bdr)}
+.ph-t{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.ph-s{font-size:12px;color:var(--mut)}
+.ph-r{margin-left:auto;display:flex;gap:6px;align-items:center}
+.sel{
+  padding:5px 10px;border-radius:5px;background:var(--sur);
+  border:1px solid var(--bdr);color:var(--txt);
+  font-family:var(--font);font-size:12px;outline:none;cursor:pointer;
+}
+
+/* ── KPI ── */
+.kgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi{
+  background:var(--bg2);border:1px solid var(--bdr);
+  border-radius:9px;padding:15px 17px;position:relative;overflow:hidden;
+}
+.kpi::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--ac,transparent),transparent);
+}
+.kpi.g{--ac:var(--g)}.kpi.b{--ac:var(--b)}.kpi.a{--ac:var(--a)}.kpi.r{--ac:var(--r)}
+.kl{font-size:10.5px;color:var(--mut);margin-bottom:5px;font-weight:500}
+.kv{font-size:21px;font-weight:700;font-family:var(--mono);letter-spacing:-.5px}
+.ks{font-size:10.5px;color:var(--mut);margin-top:3px}
+.up{color:var(--g)}.dn{color:var(--r)}.neu{color:var(--mut)}
+
+/* ── GRID / CARD ── */
+.grid{display:grid;gap:14px;margin-bottom:14px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
+.g13{grid-template-columns:1.6fr 1fr}.g31{grid-template-columns:1fr 1.6fr}
+.s2{grid-column:span 2}
+.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:17px}
+.cttl{
+  font-size:12.5px;font-weight:600;margin-bottom:13px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.cnote{font-size:10px;color:var(--mut);font-weight:400;font-family:var(--mono)}
+canvas{max-height:260px}
+canvas.tall{max-height:340px}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead tr{border-bottom:1px solid var(--bdr2)}
+th{
+  padding:8px 10px;text-align:left;white-space:nowrap;
+  font-size:10px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--dim);
+}
+th.r{text-align:right}
+td{padding:7px 10px;border-bottom:1px solid rgba(36,48,80,.5)}
+td.r{text-align:right;font-family:var(--mono);font-size:11.5px}
+tr:hover td{background:rgba(24,32,50,.5)}
+
+/* ── HEATMAP ── */
+.hmgrid{display:grid;gap:2px;overflow-x:auto}
+.hmrow{display:grid;gap:2px;margin-bottom:2px}
+.hmcell{
+  height:30px;border-radius:3px;display:flex;align-items:center;
+  justify-content:center;font-size:10.5px;font-weight:600;
+  font-family:var(--mono);cursor:default;transition:transform .15s;
+  white-space:nowrap;
+}
+.hmcell:hover{transform:scale(1.06);z-index:10;position:relative;box-shadow:0 2px 12px rgba(0,0,0,.4)}
+.hmlbl{font-size:11px;color:var(--mut);text-align:right;padding-right:8px;display:flex;align-items:center;justify-content:flex-end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hmyr{font-size:10px;color:var(--mut);text-align:center;padding-bottom:5px;font-family:var(--mono)}
+
+/* ── DRILL ── */
+.dpath{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:13px;font-size:12px;color:var(--mut)}
+.dcrumb{
+  padding:3px 10px;border-radius:4px;background:var(--sur);
+  border:1px solid var(--bdr);cursor:pointer;transition:all .1s;
+}
+.dcrumb:hover,.dcrumb.on{border-color:var(--g);color:var(--g);background:var(--g2)}
+.dsep{color:var(--dim)}
+
+/* ── FILTER ── */
+.fbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px;align-items:center}
+.flbl{font-size:10px;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.chip{
+  padding:4px 11px;border-radius:14px;font-size:11.5px;font-weight:500;
+  border:1px solid var(--bdr);background:var(--sur);color:var(--mut);
+  cursor:pointer;transition:all .1s;
+}
+.chip:hover{border-color:var(--bdr2);color:var(--txt)}
+.chip.on{background:var(--g2);border-color:var(--g3);color:var(--g)}
+
+/* ── INFO BOX ── */
+.info{
+  padding:11px 15px;border-radius:7px;font-size:12px;
+  line-height:1.8;margin-bottom:14px;color:var(--mut);
+}
+.info.g{background:rgba(29,233,176,.03);border:1px solid rgba(29,233,176,.14)}
+.info.a{background:rgba(255,184,48,.04);border:1px solid rgba(255,184,48,.18)}
+.info strong{color:var(--txt)}
+
+/* ── LOADER ── */
+.loader{
+  position:fixed;inset:0;z-index:999;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+  background:rgba(8,12,20,.9);backdrop-filter:blur(12px);
+}
+.loader.h{display:none}
+.spin{
+  width:42px;height:42px;border-radius:50%;
+  border:3px solid var(--bdr2);border-top-color:var(--g);
+  animation:rot .8s linear infinite;
+}
+@keyframes rot{to{transform:rotate(360deg)}}
+.lmsg{font-size:14px;color:var(--mut)}
+.lpbar{width:260px;height:3px;background:var(--bdr2);border-radius:2px;overflow:hidden}
+.lpfill{height:100%;background:var(--g);width:0;transition:width .4s}
+
+/* ── TAGS ── */
+.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.3px}
+.tag.g{background:var(--g2);border:1px solid var(--g3);color:var(--g)}
+.tag.r{background:rgba(255,92,114,.1);border:1px solid rgba(255,92,114,.25);color:var(--r)}
+.tag.a{background:rgba(255,184,48,.1);border:1px solid rgba(255,184,48,.25);color:var(--a)}
+.tag.b{background:rgba(77,166,255,.1);border:1px solid rgba(77,166,255,.25);color:var(--b)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bdr2);border-radius:2px}
+
+@media(max-width:1100px){
+  .kgrid{grid-template-columns:1fr 1fr}
+  .g2,.g3,.g13,.g31{grid-template-columns:1fr}
+}
+@media(max-width:720px){.side{display:none}.kgrid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div class="loader" id="loader">
+  <div class="spin"></div>
+  <div class="lmsg" id="lmsg">데이터 로드 중...</div>
+  <div class="lpbar"><div class="lpfill" id="lfill"></div></div>
+</div>
+
+<!-- HEADER -->
+<header class="hd">
+  <a class="logo" href="#">
+    <div class="logo-mark">🌿</div>
+    <div>
+      <div class="logo-tx">기후재정 분석 대시보드</div>
+      <div class="logo-sub">Korea Climate Fiscal Tracker · 열린재정 Open API</div>
+    </div>
+  </a>
+  <div class="sep"></div>
+  <nav class="nav">
+    <button class="nb on"  onclick="gp('ov')">개요</button>
+    <button class="nb"     onclick="gp('trend')">연도별 추이</button>
+    <button class="nb"     onclick="gp('drill')">드릴다운</button>
+    <button class="nb"     onclick="gp('hm')">증감 히트맵</button>
+    <button class="nb"     onclick="gp('min')">부처별 순위</button>
+  </nav>
+  <div class="hright">
+    <div class="udot" id="udot"></div>
+    <span class="utxt" id="utxt">로드 중...</span>
+    <button class="share-btn" onclick="shareUrl()">🔗 공유</button>
+  </div>
+</header>
+
+<div class="wrap">
+<!-- SIDEBAR -->
+<nav class="side">
+  <div class="slbl">분석 뷰</div>
+  <div class="si on" onclick="gp('ov')"><span class="sico">📊</span>종합 개요</div>
+  <div class="si"    onclick="gp('trend')"><span class="sico">📈</span>연도별 추이</div>
+  <div class="si"    onclick="gp('drill')"><span class="sico">🔍</span>드릴다운</div>
+  <div class="si"    onclick="gp('hm')"><span class="sico">🟩</span>증감 히트맵</div>
+  <div class="si"    onclick="gp('min')"><span class="sico">🏛</span>부처별 순위</div>
+  <hr class="shr">
+  <div class="slbl">연도 필터</div>
+  <div class="syear-filter" id="yearFilter"></div>
+  <hr class="shr">
+  <div class="slbl">데이터 현황</div>
+  <div class="sinfo" id="sinfo">로드 중...</div>
+  <hr class="shr">
+  <div class="slbl">출처</div>
+  <div class="sinfo">
+    📡 열린재정 Open API<br>
+    🏛 기획재정부·환경부<br>
+    📋 나라살림연구소 분류 기준<br>
+    🔄 매월 1일 자동 갱신
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ══ 개요 ══ -->
+<div class="pg on" id="pg-ov">
+  <div class="ph">
+    <div>
+      <div class="ph-t">종합 개요</div>
+      <div class="ph-s">중앙정부 기후·온실가스 감축 예산 현황</div>
+    </div>
+    <div class="ph-r">
+      <span style="font-size:11px;color:var(--mut)">기준연도</span>
+      <select class="sel" id="ov-yr" onchange="renderOv()"></select>
+    </div>
+  </div>
+  <div class="kgrid" id="ov-kpi"></div>
+  <div class="grid g2">
+    <div class="card"><div class="cttl">온실가스 감축 프로그램 합계 추이 <span class="cnote">백만원</span></div><canvas id="c-ov1"></canvas></div>
+    <div class="card"><div class="cttl">총지출 대비 감축예산 비중 <span class="cnote">%</span></div><canvas id="c-ov2"></canvas></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="cttl">분야별 예산 구성 (기준연도) <span class="cnote">백만원</span></div><canvas id="c-ov3"></canvas></div>
+    <div class="card"><div class="cttl">핵심 프로그램 구성 <span class="cnote">도넛</span></div><canvas id="c-ov4"></canvas></div>
+  </div>
+</div>
+
+<!-- ══ 연도별 추이 ══ -->
+<div class="pg" id="pg-trend">
+  <div class="ph">
+    <div>
+      <div class="ph-t">연도별 추이</div>
+      <div class="ph-s">프로그램별 22→23→24→25→26년 변화</div>
+    </div>
+    <div class="ph-r">
+      <div class="fbar" style="margin:0;gap:5px">
+        <button class="chip on" onclick="setLv('prog',this)">프로그램</button>
+        <button class="chip"    onclick="setLv('field',this)">분야</button>
+        <button class="chip"    onclick="setLv('sector',this)">부문</button>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="cttl">스택 바 추이 <span class="cnote">백만원 · 항목 클릭 → 드릴다운</span></div>
+    <canvas id="c-stack" class="tall"></canvas>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="cttl">라인 추이 <span class="cnote">백만원</span></div><canvas id="c-line" class="tall"></canvas></div>
+    <div class="card"><div class="cttl">22→최신 증감률 순위 <span class="cnote">%</span></div><canvas id="c-chg" class="tall"></canvas></div>
+  </div>
+</div>
+
+<!-- ══ 드릴다운 ══ -->
+<div class="pg" id="pg-drill">
+  <div class="ph">
+    <div>
+      <div class="ph-t">드릴다운 탐색</div>
+      <div class="ph-s">분야 → 부문 → 프로그램 클릭하여 하위 탐색</div>
+    </div>
+    <div class="ph-r">
+      <select class="sel" id="drill-yr" onchange="renderDrill()"></select>
+    </div>
+  </div>
+  <div class="dpath" id="dpath"></div>
+  <div class="grid g31">
+    <div class="card"><div class="cttl" id="dchttl">구성 <span class="cnote">현액 기준</span></div><canvas id="c-drill" class="tall"></canvas></div>
+    <div class="card"><div class="cttl" id="dlttl">목록</div><div class="tw" id="dlist"></div></div>
+  </div>
+</div>
+
+<!-- ══ 히트맵 ══ -->
+<div class="pg" id="pg-hm">
+  <div class="ph">
+    <div>
+      <div class="ph-t">증감 히트맵</div>
+      <div class="ph-s">연도별 전년 대비 증감률 · 초록=증가 · 빨강=감소</div>
+    </div>
+    <div class="ph-r">
+      <div class="fbar" style="margin:0;gap:5px">
+        <button class="chip on" onclick="setHm('yoy',this)">전년대비</button>
+        <button class="chip"    onclick="setHm('base',this)">기준연도대비</button>
+      </div>
+    </div>
+  </div>
+  <div class="card"><div class="cttl">기후 프로그램 × 연도 히트맵 <span class="cnote">마우스 올리면 수치 표시</span></div>
+    <div id="hmwrap"></div>
+  </div>
+</div>
+
+<!-- ══ 부처별 ══ -->
+<div class="pg" id="pg-min">
+  <div class="ph">
+    <div>
+      <div class="ph-t">부처별 기후예산 순위</div>
+      <div class="ph-s">기후·온실가스 관련 프로그램 합산 기준</div>
+    </div>
+    <div class="ph-r">
+      <select class="sel" id="min-yr" onchange="renderMin()"></select>
+    </div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><div class="cttl" id="mbttl">부처별 기후예산 <span class="cnote">백만원</span></div><canvas id="c-mbar" class="tall"></canvas></div>
+    <div class="card"><div class="cttl">전년 대비 증감률 <span class="cnote">%</span></div><canvas id="c-mchg" class="tall"></canvas></div>
+  </div>
+  <div class="card"><div class="cttl">부처별 상세 테이블</div><div class="tw" id="mtbl"></div></div>
+</div>
+
+</main>
+</div><!-- /wrap -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  상수
+// ═══════════════════════════════════════════════════════
+const DATA_BASE = './data/';
+const CLIM_PROGS = [
+  '공정한전환','기후변화 과학','기후변화대응','대기환경 보전',
+  '에너지기술개발','온실가스감축','재생에너지및에너지신산업활성화',
+  '저탄소생태계조성','탄소중립기반구축','환경보건관리',
+  '화학물질 안전관리','수질 및 수생태계 관리','자연생태 보전','친환경경제사회 활성화',
+];
+const CLIM_FIELDS=['환경','산업·중소기업및에너지','교통및물류','국토및지역개발','농림수산','과학기술'];
+const COLORS=['#1de9b0','#4da6ff','#ffb830','#ff5c72','#b388ff','#ff8a65','#40e0d0','#f06292','#aed581','#80deea','#ce93d8','#a5d6a7','#fff176','#ef9a9a'];
+
+// ═══════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════
+let D = {};           // { [year]: { summary, climate_rows } }
+let META = null;
+let availYears = [];
+let selYears = [];
+let curPg = 'ov';
+let trendLv = 'prog';
+let hmMode = 'yoy';
+let drillStack = [];
+const charts = {};
+
+// ═══════════════════════════════════════════════════════
+//  Loader
+// ═══════════════════════════════════════════════════════
+function setLoader(show, msg='', pct=0) {
+  document.getElementById('loader').className = 'loader'+(show?'':' h');
+  document.getElementById('lmsg').textContent = msg;
+  document.getElementById('lfill').style.width = pct+'%';
+}
+function setStatus(t, msg) {
+  document.getElementById('udot').className='udot '+t;
+  document.getElementById('utxt').textContent=msg;
+}
+
+// ═══════════════════════════════════════════════════════
+//  데이터 로드
+// ═══════════════════════════════════════════════════════
+async function loadData() {
+  setLoader(true,'메타데이터 확인 중...',10);
+  setStatus('spin','로드 중...');
+
+  // meta.json 로드
+  try {
+    const res = await fetch(DATA_BASE+'meta.json', {cache:'no-store'});
+    if (!res.ok) throw new Error('meta.json 없음');
+    META = await res.json();
+    availYears = META.collected_years || [];
+  } catch {
+    // meta 없으면 연도 파일 직접 탐색
+    availYears = [];
+    for (const y of [2022,2023,2024,2025,2026]) {
+      try {
+        const r = await fetch(DATA_BASE+`budget_${y}.json`, {method:'HEAD'});
+        if (r.ok) availYears.push(y);
+      } catch {}
+    }
+  }
+
+  if (availYears.length === 0) {
+    setLoader(false);
+    setStatus('err','데이터 없음 — GitHub Actions를 실행하세요');
+    loadFallback();
+    return;
+  }
+
+  // 연도별 데이터 로드
+  const total = availYears.length;
+  for (let i=0; i<total; i++) {
+    const yr = availYears[i];
+    setLoader(true, `${yr}년 데이터 로드 중... (${i+1}/${total})`, 15+((i+1)/total)*75);
+    try {
+      const res = await fetch(DATA_BASE+`budget_${yr}.json`);
+      if (res.ok) D[yr] = await res.json();
+    } catch(e) {
+      console.warn(`${yr}년 로드 실패:`, e);
+    }
+  }
+
+  selYears = [...availYears];
+  const ts = META?.last_updated
+    ? new Date(META.last_updated).toLocaleDateString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+    : '알 수 없음';
+
+  setStatus('ok', `${availYears.join(',')}년 · 갱신: ${ts}`);
+  document.getElementById('sinfo').innerHTML =
+    `📅 수집 연도: ${availYears.join(', ')}<br>🔄 최종 갱신: ${ts}<br>📊 출처: 열린재정 API`;
+
+  initYearFilter();
+  initYearSelects();
+  setLoader(false);
+  renderAll();
+}
+
+// PDF 하드코딩 fallback
+function loadFallback() {
+  const FBY=[2022,2023,2024,2025,2026];
+  const FBP={
+    '공정한전환':         [183654,203781,197272,207735,216175],
+    '기후변화 과학':      [14592,15016,17446,18108,15375],
+    '기후변화대응':       [27644,35431,25556,10398,9487],
+    '대기환경 보전':      [3863896,3783335,3631582,3713018,3641406],
+    '에너지기술개발':     [862207,839704,766975,719484,741683],
+    '온실가스감축':       [949823,986624,978415,860677,917667],
+    '재생에너지및에너지신산업활성화':[1553108,1150132,732540,665741,1227750],
+    '저탄소생태계조성':   [643599,636422,606328,568427,586750],
+    '탄소중립기반구축':   [576877,627591,478174,685711,837503],
+  };
+  const GOV=[607663263,638727655,656618248,673301432,728005948];
+  FBY.forEach((yr,i)=>{
+    const by_program={};
+    Object.entries(FBP).forEach(([k,v])=>{
+      by_program[k]={budget_cur:v[i],budget_init:v[i],exec_amt:0,is_climate:true,field:'환경'};
+    });
+    D[yr]={year:yr,summary:{by_program,by_field:{},by_sector:{},by_ministry:{},gov_total:GOV[i],climate_total:Object.values(FBP).reduce((s,v)=>s+v[i],0)}};
+  });
+  availYears=[...FBY]; selYears=[...FBY];
+  setStatus('spin','PDF 데이터 (GitHub Actions 실행 필요)');
+  document.getElementById('sinfo').innerHTML='📄 PDF 하드코딩 데이터<br>🔄 실시간 데이터는 GitHub<br>   Actions 실행 후 갱신됩니다';
+  initYearFilter(); initYearSelects(); renderAll();
+}
+
+// ═══════════════════════════════════════════════════════
+//  유틸
+// ═══════════════════════════════════════════════════════
+function fmt(v){
+  if(v==null||isNaN(v))return'-';
+  const n=Number(v);
+  if(Math.abs(n)>=1e6)return(n/1e6).toFixed(2)+'조';
+  if(Math.abs(n)>=1e4)return(n/1e4).toFixed(0)+'억';
+  if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'십억';
+  return n.toLocaleString()+'백만';
+}
+function pct(a,b){if(!b)return null;return((a-b)/b*100).toFixed(1)}
+function cClass(v){const n=Number(v);return n>0?'up':n<0?'dn':'neu'}
+function arr(v){const n=Number(v);return n>0?'▲':n<0?'▼':'―'}
+
+const AX={
+  x:{ticks:{color:'#607090',font:{size:10.5}},grid:{color:'rgba(36,48,80,.5)'}},
+  y:{ticks:{color:'#607090',font:{size:10.5}},grid:{color:'rgba(36,48,80,.5)'}},
+};
+function mkc(id,cfg){
+  if(charts[id])charts[id].destroy();
+  const el=document.getElementById(id);
+  if(!el)return;
+  charts[id]=new Chart(el,cfg);
+  return charts[id];
+}
+
+// ═══════════════════════════════════════════════════════
+//  연도 필터 / 셀렉트 초기화
+// ═══════════════════════════════════════════════════════
+function initYearFilter() {
+  document.getElementById('yearFilter').innerHTML = availYears.map(y=>
+    `<span class="ychip on" onclick="toggleYr(${y},this)">${y}</span>`
+  ).join(' ');
+}
+function toggleYr(y, el) {
+  el.classList.toggle('on');
+  if(selYears.includes(y)) selYears=selYears.filter(v=>v!==y);
+  else selYears=[...selYears,y].sort();
+  renderAll();
+}
+function initYearSelects() {
+  ['ov-yr','drill-yr','min-yr'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.innerHTML=availYears.slice().reverse().map(y=>`<option value="${y}">${y}년</option>`).join('');
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  집계 헬퍼
+// ═══════════════════════════════════════════════════════
+function sumByProg(years) {
+  const out={};
+  years.forEach(yr=>{
+    const bp=D[yr]?.summary?.by_program||{};
+    Object.entries(bp).forEach(([k,v])=>{
+      if(!out[k])out[k]={};
+      out[k][yr]=(out[k][yr]||0)+(v.budget_cur||v.budget_init||0);
+    });
+  });
+  return out;
+}
+function sumByField(years) {
+  const out={};
+  years.forEach(yr=>{
+    const bf=D[yr]?.summary?.by_field||{};
+    Object.entries(bf).forEach(([k,v])=>{ out[k]={...(out[k]||{})}; out[k][yr]=(out[k][yr]||0)+v; });
+  });
+  return out;
+}
+function sumByMin(years) {
+  const out={};
+  years.forEach(yr=>{
+    const bm=D[yr]?.summary?.by_ministry||{};
+    Object.entries(bm).forEach(([k,v])=>{
+      if(!out[k])out[k]={};
+      out[k][yr]=(out[k][yr]||0)+(v.budget_cur||0);
+    });
+  });
+  return out;
+}
+function govTotal(yr){ return D[yr]?.summary?.gov_total||0; }
+function climTotal(yr){ return availYears.includes(yr)?Object.values(D[yr]?.summary?.by_program||{}).filter((_,i,a)=>CLIM_PROGS.includes(Object.keys(D[yr]?.summary?.by_program||{})[i])).reduce((s,v)=>s+(v.budget_cur||0),0):0; }
+function climTotalFast(yr){
+  const bp=D[yr]?.summary?.by_program||{};
+  return CLIM_PROGS.reduce((s,k)=>s+(bp[k]?.budget_cur||0),0);
+}
+
+// ═══════════════════════════════════════════════════════
+//  렌더: 개요
+// ═══════════════════════════════════════════════════════
+function renderOv(){
+  if(!Object.keys(D).length)return;
+  const yr=parseInt(document.getElementById('ov-yr').value)||availYears[availYears.length-1];
+  const prevYr=yr-1;
+  const gov=govTotal(yr), govP=govTotal(prevYr);
+  const ct=climTotalFast(yr), ctP=climTotalFast(prevYr);
+  const ratio=gov>0?(ct/gov*100).toFixed(2):0;
+  const ratioP=govP>0?(ctP/govP*100).toFixed(2):0;
+  const re=(D[yr]?.summary?.by_program||{})['재생에너지및에너지신산업활성화']?.budget_cur||0;
+  const reP=(D[prevYr]?.summary?.by_program||{})['재생에너지및에너지신산업활성화']?.budget_cur||0;
+
+  document.getElementById('ov-kpi').innerHTML=[
+    {cls:'g',l:'정부 총지출 ('+yr+'년)',v:fmt(gov),s:`<span class="${cClass(pct(gov,govP))}">${arr(pct(gov,govP))}${Math.abs(Number(pct(gov,govP)))}%</span> vs ${prevYr}`},
+    {cls:'a',l:'기후감축 프로그램 합계',v:fmt(ct),s:`<span class="${cClass(pct(ct,ctP))}">${arr(pct(ct,ctP))}${Math.abs(Number(pct(ct,ctP)))}%</span> vs ${prevYr}`},
+    {cls:'b',l:'총지출 대비 감축비중',v:ratio+'%',s:`${prevYr}년 ${ratioP}%`},
+    {cls:'r',l:'재생에너지 프로그램',v:fmt(re),s:`<span class="${cClass(pct(re,reP))}">${arr(pct(re,reP))}${Math.abs(Number(pct(re,reP)))}%</span> vs ${prevYr}`},
+  ].map(k=>`<div class="kpi ${k.cls}"><div class="kl">${k.l}</div><div class="kv">${k.v}</div><div class="ks">${k.s}</div></div>`).join('');
+
+  const byP=sumByProg(selYears);
+  const climKeys=CLIM_PROGS.filter(k=>byP[k]);
+
+  mkc('c-ov1',{type:'bar',data:{labels:selYears,
+    datasets:[
+      {label:'기후감축 합계',data:selYears.map(y=>climKeys.reduce((s,k)=>s+(byP[k]?.[y]||0),0)),
+        backgroundColor:selYears.map(y=>y===yr?'rgba(29,233,176,.85)':'rgba(29,233,176,.25)'),borderColor:'#1de9b0',borderWidth:1,borderRadius:4},
+      {type:'line',label:'22년 기준선',data:selYears.map(()=>climKeys.reduce((s,k)=>s+(byP[k]?.[selYears[0]]||0),0)),
+        borderColor:'rgba(255,92,114,.5)',borderDash:[5,4],pointRadius:0,borderWidth:1.5},
+    ]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{labels:{color:'#607090',font:{size:11},boxWidth:12}}},
+      scales:{x:{...AX.x},y:{...AX.y,ticks:{...AX.y.ticks,callback:v=>fmt(v)}}}}
+  });
+
+  mkc('c-ov2',{type:'line',data:{labels:selYears,
+    datasets:[{label:'감축예산/총지출',
+      data:selYears.map(y=>{const g=govTotal(y);const c=climKeys.reduce((s,k)=>s+(byP[k]?.[y]||0),0);return g>0?(c/g*100).toFixed(2):null}),
+      borderColor:'#ffb830',backgroundColor:'rgba(255,184,48,.08)',fill:true,tension:.4,pointRadius:5,pointBackgroundColor:'#ffb830'}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{labels:{color:'#607090',font:{size:11}}}},
+      scales:{x:{...AX.x},y:{...AX.y,ticks:{...AX.y.ticks,callback:v=>v+'%'}}}}
+  });
+
+  // 분야별
+  const bf=sumByField(selYears);
+  const fkeys=Object.keys(bf).filter(k=>CLIM_FIELDS.includes(k));
+  mkc('c-ov3',{type:'bar',
+    data:{labels:fkeys,datasets:[{label:yr+'년',data:fkeys.map(k=>bf[k]?.[yr]||0),backgroundColor:COLORS.map(c=>c+'aa'),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',
+      plugins:{legend:{labels:{color:'#607090',font:{size:11}}}},
+      scales:{x:{...AX.x,ticks:{...AX.x.ticks,callback:v=>fmt(v)}},y:{...AX.y}}}
+  });
+
+  const progVals=climKeys.map(k=>byP[k]?.[yr]||0);
+  mkc('c-ov4',{type:'doughnut',
+    data:{labels:climKeys,datasets:[{data:progVals,backgroundColor:COLORS.map(c=>c+'cc'),borderColor:COLORS,borderWidth:1.5}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{position:'right',labels:{color:'#607090',font:{size:10},boxWidth:10}},
+        tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}}}
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  렌더: 추이
+// ═══════════════════════════════════════════════════════
+function renderTrend(){
+  if(!Object.keys(D).length)return;
+  let src;
+  if(trendLv==='field') src=sumByField(selYears);
+  else if(trendLv==='sector'){
+    src={};
+    selYears.forEach(yr=>{
+      const bs=D[yr]?.summary?.by_sector||{};
+      Object.entries(bs).forEach(([k,v])=>{if(!src[k])src[k]={};src[k][yr]=(src[k][yr]||0)+v;});
+    });
+  } else src=sumByProg(selYears);
+
+  const keys=Object.keys(src).filter(k=>k).sort((a,b)=>(src[b]?.[selYears[selYears.length-1]]||0)-(src[a]?.[selYears[selYears.length-1]]||0)).slice(0,14);
+
+  mkc('c-stack',{type:'bar',data:{labels:selYears,
+    datasets:keys.map((k,i)=>({label:k,data:selYears.map(y=>src[k]?.[y]||0),
+      backgroundColor:COLORS[i%COLORS.length]+'88',borderColor:COLORS[i%COLORS.length],borderWidth:.5,stack:'s'}))},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:true,position:'bottom',labels:{color:'#607090',font:{size:10},boxWidth:10}}},
+      scales:{x:{...AX.x,stacked:true},y:{...AX.y,stacked:true,ticks:{...AX.y.ticks,callback:v=>fmt(v)}}}}
+  });
+
+  mkc('c-line',{type:'line',data:{labels:selYears,
+    datasets:keys.slice(0,9).map((k,i)=>({label:k,data:selYears.map(y=>src[k]?.[y]||0),
+      borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length]+'15',tension:.35,pointRadius:4,borderWidth:2}))},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{display:true,position:'bottom',labels:{color:'#607090',font:{size:10},boxWidth:10}}},
+      scales:{x:{...AX.x},y:{...AX.y,ticks:{...AX.y.ticks,callback:v=>fmt(v)}}}}
+  });
+
+  const y0=selYears[0],yN=selYears[selYears.length-1];
+  const sorted=keys.map(k=>({k,v:Number(pct(src[k]?.[yN]||0,src[k]?.[y0]||0))})).filter(x=>!isNaN(x.v)).sort((a,b)=>b.v-a.v);
+  mkc('c-chg',{type:'bar',data:{labels:sorted.map(x=>x.k),
+    datasets:[{label:`${y0}→${yN} 증감률`,data:sorted.map(x=>x.v),
+      backgroundColor:sorted.map(x=>x.v>=0?'rgba(29,233,176,.7)':'rgba(255,92,114,.7)'),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',
+      plugins:{legend:{labels:{color:'#607090',font:{size:11}}}},
+      scales:{x:{...AX.x,ticks:{...AX.x.ticks,callback:v=>v+'%'}},y:{...AX.y}}}
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  렌더: 드릴다운
+// ═══════════════════════════════════════════════════════
+function renderDrill(){
+  if(!Object.keys(D).length)return;
+  const yr=parseInt(document.getElementById('drill-yr').value)||availYears[availYears.length-1];
+  const bp=D[yr]?.summary?.by_program||{};
+  const bf=D[yr]?.summary?.by_field||{};
+  const bs=D[yr]?.summary?.by_sector||{};
+
+  // 브레드크럼
+  const pEl=document.getElementById('dpath');
+  pEl.innerHTML=`<span class="dcrumb on" onclick="drillReset()">전체</span>`;
+  drillStack.forEach((d,i)=>pEl.innerHTML+=`<span class="dsep">›</span><span class="dcrumb on" onclick="drillBack(${i})">${d}</span>`);
+
+  // 현재 레벨에 따라 데이터 선택
+  let items;
+  if(drillStack.length===0){
+    // 분야 레벨
+    items=Object.entries(bf).filter(([k])=>k&&CLIM_FIELDS.includes(k)).map(([k,v])=>({name:k,val:v})).sort((a,b)=>b.val-a.val);
+  } else {
+    // 분야 선택 후 → 해당 분야 프로그램
+    const selField=drillStack[0];
+    items=Object.entries(bp).filter(([k,v])=>v.field===selField||v.is_climate).map(([k,v])=>({name:k,val:v.budget_cur||0})).sort((a,b)=>b.val-a.val);
+  }
+  if(!items.length) items=Object.entries(bp).map(([k,v])=>({name:k,val:v.budget_cur||0})).sort((a,b)=>b.val-a.val).slice(0,20);
+
+  const lv=drillStack.length===0?'분야':'프로그램';
+  document.getElementById('dchttl').innerHTML=`${lv} 구성 <span class="cnote">${yr}년 현액</span>`;
+  document.getElementById('dlttl').textContent=`${lv} 목록`;
+
+  mkc('c-drill',{type:'doughnut',
+    data:{labels:items.slice(0,12).map(x=>x.name),
+      datasets:[{data:items.slice(0,12).map(x=>x.val),backgroundColor:COLORS.map(c=>c+'cc'),borderColor:COLORS,borderWidth:1.5}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{legend:{position:'right',labels:{color:'#607090',font:{size:10},boxWidth:10}},
+        tooltip:{callbacks:{label:c=>c.label+': '+fmt(c.raw)}}},
+      onClick:(_,els)=>{if(els[0]&&drillStack.length===0){drillStack.push(items[els[0].index].name);renderDrill();}}}
+  });
+
+  const total=items.reduce((s,x)=>s+x.val,0);
+  let html=`<table><thead><tr><th>이름</th><th class="r">${yr}년</th><th class="r">비중</th></tr></thead><tbody>`;
+  items.slice(0,20).forEach((x,i)=>{
+    const r=total>0?(x.val/total*100).toFixed(1):'0.0';
+    html+=`<tr onclick="${drillStack.length===0?`drillInto('${x.name.replace(/'/g,"\\'")}')`:'void(0)'}" style="${drillStack.length===0?'cursor:pointer':''}">
+      <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${COLORS[i%COLORS.length]};margin-right:6px"></span>${x.name}</td>
+      <td class="r">${fmt(x.val)}</td><td class="r" style="color:${x.val>0?'var(--g)':'var(--mut)'}">${r}%</td>
+    </tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('dlist').innerHTML=html;
+}
+function drillInto(name){drillStack.push(name);renderDrill()}
+function drillBack(i){drillStack=drillStack.slice(0,i+1);renderDrill()}
+function drillReset(){drillStack=[];renderDrill()}
+
+// ═══════════════════════════════════════════════════════
+//  렌더: 히트맵
+// ═══════════════════════════════════════════════════════
+function renderHm(){
+  if(!Object.keys(D).length)return;
+  const byP=sumByProg(selYears);
+  const keys=CLIM_PROGS.filter(k=>byP[k]);
+  const yrs=selYears.slice(1);
+  function hcol(v){
+    const n=Number(v);if(isNaN(n))return'background:var(--sur)';
+    const a=Math.min(Math.abs(n)/60,1);
+    if(n>0)return`background:rgba(29,233,176,${.1+a*.7});color:${a>.55?'#080c14':'var(--g)'}`;
+    return`background:rgba(255,92,114,${.1+a*.7});color:${a>.55?'#080c14':'var(--r)'}`;
+  }
+  const cols=`140px repeat(${yrs.length},1fr)`;
+  let html=`<div class="hmgrid">
+    <div class="hmrow" style="grid-template-columns:${cols}">
+      <div></div>${yrs.map(y=>`<div class="hmyr">${y}<br><span style="font-size:9px;color:var(--dim)">${hmMode==='yoy'?'vs '+(y-1):'vs '+selYears[0]}</span></div>`).join('')}
+    </div>`;
+  keys.forEach(k=>{
+    const row=`<div class="hmrow" style="grid-template-columns:${cols}">
+      <div class="hmlbl" title="${k}">${k.length>12?k.slice(0,11)+'…':k}</div>
+      ${yrs.map(y=>{
+        const base=hmMode==='yoy'?y-1:selYears[0];
+        const v=Number(pct(byP[k]?.[y]||0,byP[k]?.[base]||0));
+        const label=isNaN(v)?'-':v+'%';
+        return`<div class="hmcell" style="${hcol(v)}" title="${k} ${y}년: ${label}">${label}</div>`;
+      }).join('')}
+    </div>`;
+    html+=row;
+  });
+  html+=`</div>
+  <div style="display:flex;align-items:center;gap:14px;margin-top:14px;font-size:11px;color:var(--mut);flex-wrap:wrap">
+    ${[15,30,50].map(v=>`<span style="display:flex;align-items:center;gap:5px">
+      <span style="width:22px;height:14px;border-radius:2px;display:inline-block;background:rgba(29,233,176,${.1+v/100*.7})"></span>+${v}%
+    </span>`).join('')}
+    <span style="margin:0 8px;color:var(--bdr2)">|</span>
+    ${[15,30,50].map(v=>`<span style="display:flex;align-items:center;gap:5px">
+      <span style="width:22px;height:14px;border-radius:2px;display:inline-block;background:rgba(255,92,114,${.1+v/100*.7})"></span>-${v}%
+    </span>`).join('')}
+  </div>`;
+  document.getElementById('hmwrap').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════
+//  렌더: 부처별
+// ═══════════════════════════════════════════════════════
+function renderMin(){
+  if(!Object.keys(D).length)return;
+  const yr=parseInt(document.getElementById('min-yr').value)||availYears[availYears.length-1];
+  const bm=sumByMin(selYears);
+  const sorted=Object.entries(bm).filter(([k])=>k).map(([k,v])=>({n:k,cur:v[yr]||0,prev:v[yr-1]||0})).filter(x=>x.cur>0).sort((a,b)=>b.cur-a.cur).slice(0,15);
+  document.getElementById('mbttl').innerHTML=`부처별 기후예산 (${yr}년) <span class="cnote">백만원</span>`;
+  mkc('c-mbar',{type:'bar',data:{labels:sorted.map(x=>x.n),
+    datasets:[
+      {label:(yr-1)+'년',data:sorted.map(x=>x.prev),backgroundColor:'rgba(77,166,255,.4)',borderRadius:3},
+      {label:yr+'년',data:sorted.map(x=>x.cur),backgroundColor:'rgba(29,233,176,.7)',borderRadius:3},
+    ]},
+    options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',
+      plugins:{legend:{labels:{color:'#607090',font:{size:11},boxWidth:10}}},
+      scales:{x:{...AX.x,ticks:{...AX.x.ticks,callback:v=>fmt(v)}},y:{...AX.y}}}
+  });
+  const chgs=sorted.map(x=>({n:x.n,v:Number(pct(x.cur,x.prev))}));
+  mkc('c-mchg',{type:'bar',data:{labels:chgs.map(x=>x.n),
+    datasets:[{label:'전년대비 증감률',data:chgs.map(x=>isNaN(x.v)?0:x.v),
+      backgroundColor:chgs.map(x=>x.v>=0?'rgba(29,233,176,.7)':'rgba(255,92,114,.7)'),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',
+      plugins:{legend:{labels:{color:'#607090',font:{size:11}}}},
+      scales:{x:{...AX.x,ticks:{...AX.x.ticks,callback:v=>v+'%'}},y:{...AX.y}}}
+  });
+  let html=`<table><thead><tr><th>부처</th><th class="r">${yr-1}년</th><th class="r">${yr}년</th><th class="r">증감액</th><th class="r">증감률</th></tr></thead><tbody>`;
+  sorted.forEach(x=>{
+    const d=x.cur-x.prev,c=Number(pct(x.cur,x.prev));
+    html+=`<tr><td>${x.n}</td><td class="r">${fmt(x.prev)}</td><td class="r" style="color:var(--g)">${fmt(x.cur)}</td>
+      <td class="r ${cClass(d)}">${d>=0?'+':''}${fmt(d)}</td>
+      <td class="r ${cClass(c)}">${arr(c)}${isNaN(c)?'-':Math.abs(c)+'%'}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  document.getElementById('mtbl').innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════
+//  페이지 네비 & 렌더러
+// ═══════════════════════════════════════════════════════
+const renderers={ov:renderOv,trend:renderTrend,drill:renderDrill,hm:renderHm,min:renderMin};
+const navMap={ov:'개요',trend:'연도별 추이',drill:'드릴다운',hm:'증감 히트맵',min:'부처별 순위'};
+const sideMap={ov:'종합 개요',trend:'연도별 추이',drill:'드릴다운',hm:'증감 히트맵',min:'부처별 분석'};
+
+function gp(id){
+  document.querySelectorAll('.pg').forEach(p=>p.className='pg');
+  document.getElementById('pg-'+id)?.classList.add('on');
+  document.querySelectorAll('.nb').forEach(b=>b.classList.toggle('on',b.textContent.trim()===navMap[id]));
+  document.querySelectorAll('.si').forEach(b=>b.classList.toggle('on',b.textContent.trim()===sideMap[id]));
+  curPg=id;
+  setTimeout(()=>renderers[id]?.(),60);
+}
+function renderAll(){setTimeout(()=>renderers[curPg]?.(),60)}
+function setLv(v,el){trendLv=v;document.querySelectorAll('#pg-trend .chip').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderTrend()}
+function setHm(v,el){hmMode=v;document.querySelectorAll('#pg-hm .chip').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderHm()}
+
+// ═══════════════════════════════════════════════════════
+//  공유
+// ═══════════════════════════════════════════════════════
+function shareUrl(){
+  const url=location.href;
+  navigator.clipboard?.writeText(url).then(()=>{
+    const btn=document.querySelector('.share-btn');
+    btn.textContent='✅ 복사됨';setTimeout(()=>btn.textContent='🔗 공유',2000);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  초기화
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', loadData);
+</script>
+</body>
+</html>
